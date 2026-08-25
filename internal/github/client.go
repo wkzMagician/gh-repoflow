@@ -257,7 +257,7 @@ func (c Client) EnsureVariable(ctx context.Context, name, value string) (bool, e
 		if actual.Value == value {
 			return false, nil
 		}
-		return true, c.api(ctx, "PUT", c.endpoint("/actions/variables/"+url.PathEscape(name)), body, nil)
+		return true, c.api(ctx, "PATCH", c.endpoint("/actions/variables/"+url.PathEscape(name)), body, nil)
 	}
 	if !isNotFound(err) {
 		return false, err
