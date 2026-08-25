@@ -69,8 +69,8 @@ func Default() Config {
 	return Config{
 		Repository: RepositoryConfig{Visibility: "public"},
 		Branches: BranchConfig{
-			Main: BranchPolicy{Approvals: 2},
-			Dev:  BranchPolicy{Approvals: 1},
+			Main: BranchPolicy{Approvals: 0},
+			Dev:  BranchPolicy{Approvals: 0},
 		},
 		CI: CIConfig{Enabled: true},
 		AI: AIConfig{
@@ -252,8 +252,8 @@ func Parse(data []byte) (Config, error) {
 	if err := s.Err(); err != nil {
 		return Config{}, err
 	}
-	if c.Branches.Main.Approvals < 1 || c.Branches.Dev.Approvals < 1 {
-		return Config{}, errors.New("branches.main.approvals and branches.dev.approvals must be at least 1")
+	if c.Branches.Main.Approvals < 0 || c.Branches.Dev.Approvals < 0 {
+		return Config{}, errors.New("branches.main.approvals and branches.dev.approvals must be non-negative")
 	}
 	if c.AI.Provider.Type == "" {
 		c.AI.Provider.Type = "openai-compatible"

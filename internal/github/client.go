@@ -413,18 +413,31 @@ func rulesetMatches(actual RuleSet, desired map[string]interface{}) bool {
 	return true
 }
 
+func isNumber(v interface{}) bool {
+	switch v.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return true
+	default:
+		return false
+	}
+}
+
 func parametersMatch(actual, desired map[string]interface{}) bool {
 	for key, expected := range desired {
 		if key == "required_status_checks" {
 			continue
 		}
-		if intValue(actual[key]) != 0 || intValue(expected) != 0 {
-			if intValue(actual[key]) != intValue(expected) {
+		actVal, hasAct := actual[key]
+		if !hasAct {
+			return false
+		}
+		if isNumber(actVal) || isNumber(expected) {
+			if intValue(actVal) != intValue(expected) {
 				return false
 			}
 			continue
 		}
-		if !reflect.DeepEqual(actual[key], expected) {
+		if !reflect.DeepEqual(actVal, expected) {
 			return false
 		}
 	}

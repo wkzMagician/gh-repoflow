@@ -54,6 +54,36 @@ func TestRulesetMatchesApprovalAndChecks(t *testing.T) {
 	}
 }
 
+func TestRulesetMatchesZeroApprovals(t *testing.T) {
+	desired := desiredRuleSetPayload(DesiredRuleSet{
+		Name: "RepoFlow main", Branch: "main", Approvals: 0,
+		RequiredChecks: []string{"test"},
+	})
+	actual := RuleSet{
+		Name: "RepoFlow main", Target: "branch", Enforcement: "active",
+		Conditions: map[string]interface{}{
+			"ref_name": map[string]interface{}{"include": []interface{}{"refs/heads/main"}},
+		},
+		Rules: []map[string]interface{}{
+			{"type": "deletion"},
+			{"type": "non_fast_forward"},
+			{"type": "pull_request", "parameters": map[string]interface{}{
+				"required_approving_review_count":   float64(0),
+				"dismiss_stale_reviews_on_push":     true,
+				"require_code_owner_review":         false,
+				"require_last_push_approval":        false,
+				"required_review_thread_resolution": true,
+			}},
+			{"type": "required_status_checks", "parameters": map[string]interface{}{
+				"required_status_checks": []interface{}{map[string]interface{}{"context": "test"}},
+			}},
+		},
+	}
+	if !rulesetMatches(actual, desired) {
+		t.Fatal("expected zero approvals ruleset to match")
+	}
+}
+
 func TestDesiredRulesetOmitsIntegrationID(t *testing.T) {
 	payload := desiredRuleSetPayload(DesiredRuleSet{
 		Name: "RepoFlow main", Branch: "main", Approvals: 2,
