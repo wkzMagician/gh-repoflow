@@ -42,9 +42,6 @@ func (r ExecRunner) run(ctx context.Context, input []byte, name string, args ...
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		if r.Stderr != nil && stderr.Len() > 0 {
-			_, _ = io.Copy(r.Stderr, &stderr)
-		}
 		message := strings.TrimSpace(stderr.String())
 		if message == "" {
 			message = err.Error()

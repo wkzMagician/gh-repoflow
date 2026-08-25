@@ -53,3 +53,37 @@ func TestRulesetMatchesApprovalAndChecks(t *testing.T) {
 		t.Fatal("expected ruleset to match")
 	}
 }
+
+func TestDesiredRulesetOmitsIntegrationID(t *testing.T) {
+	payload := desiredRuleSetPayload(DesiredRuleSet{
+		Name: "RepoFlow main", Branch: "main", Approvals: 2,
+		RequiredChecks: []string{"test"},
+	})
+	rules := payload["rules"].([]map[string]interface{})
+	for _, rule := range rules {
+		if rule["type"] == "required_status_checks" {
+			params := rule["parameters"].(map[string]interface{})
+			checks := params["required_status_checks"].([]map[string]interface{})
+			if len(checks) != 1 {
+				t.Fatalf("expected 1 check, got %d", len(checks))
+			}
+			if _, hasIntegrationID := checks[0]["integration_id"]; hasIntegrationID {
+				t.Fatalf("expected status check not to have integration_id, but found: %v", checks[0]["integration_id"])
+			}
+		}
+	}
+}
+
+func TestIsForbidden(t *testing.T) {
+	if !IsForbidden(assertErr("HTTP 403: Upgrade to GitHub Pro or make this repository public")) {
+		t.Fatal("expected 403 error to be identified as forbidden")
+	}
+	if IsForbidden(assertErr("HTTP 404: Not Found")) {
+		t.Fatal("expected 404 error not to be forbidden")
+	}
+}
+
+type testError struct{ msg string }
+
+func (e testError) Error() string { return e.msg }
+func assertErr(msg string) error  { return testError{msg: msg} }

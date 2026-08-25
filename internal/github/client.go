@@ -271,28 +271,38 @@ func (c Client) Variable(ctx context.Context, name string) (ActionsVariable, err
 	return variable, err
 }
 
+type apiErrorResponse struct {
+	Message          string `json:"message"`
+	DocumentationURL string `json:"documentation_url"`
+	Errors           []any  `json:"errors"`
+}
+
 func (c Client) api(ctx context.Context, method, endpoint string, body interface{}, result interface{}) error {
 	args := []string{"api", endpoint, "--method", method, "--header", "Accept: " + apiAccept}
+	var out string
+	var runErr error
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
 			return err
 		}
 		args = append(args, "--input", "-")
-		out, err := c.Runner.RunInput(ctx, data, "gh", args...)
-		if err != nil {
-			return fmt.Errorf("GitHub API %s %s: %w", method, endpoint, err)
-		}
-		if result != nil && strings.TrimSpace(out) != "" {
-			if err := json.Unmarshal([]byte(out), result); err != nil {
-				return fmt.Errorf("decode GitHub API response: %w", err)
-			}
-		}
-		return nil
+		out, runErr = c.Runner.RunInput(ctx, data, "gh", args...)
+	} else {
+		out, runErr = c.Runner.Run(ctx, "gh", args...)
 	}
-	out, err := c.Runner.Run(ctx, "gh", args...)
-	if err != nil {
-		return fmt.Errorf("GitHub API %s %s: %w", method, endpoint, err)
+	if runErr != nil {
+		// Try to parse GitHub API error json from output or error string if available
+		var apiErr apiErrorResponse
+		if err := json.Unmarshal([]byte(out), &apiErr); err == nil && apiErr.Message != "" {
+			detail := apiErr.Message
+			if len(apiErr.Errors) > 0 {
+				errBytes, _ := json.Marshal(apiErr.Errors)
+				detail = fmt.Sprintf("%s: %s", apiErr.Message, string(errBytes))
+			}
+			return fmt.Errorf("GitHub API %s %s: %s (%w)", method, endpoint, detail, runErr)
+		}
+		return fmt.Errorf("GitHub API %s %s: %w", method, endpoint, runErr)
 	}
 	if result != nil && strings.TrimSpace(out) != "" {
 		if err := json.Unmarshal([]byte(out), result); err != nil {
@@ -311,10 +321,18 @@ func isNotFound(err error) bool {
 	return strings.Contains(text, "404") || strings.Contains(text, "not found")
 }
 
+func IsForbidden(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "403") || strings.Contains(text, "upgrade to github pro") || strings.Contains(text, "forbidden")
+}
+
 func desiredRuleSetPayload(desired DesiredRuleSet) map[string]interface{} {
 	statusChecks := make([]map[string]interface{}, 0, len(desired.RequiredChecks))
 	for _, check := range desired.RequiredChecks {
-		statusChecks = append(statusChecks, map[string]interface{}{"context": check, "integration_id": -1})
+		statusChecks = append(statusChecks, map[string]interface{}{"context": check})
 	}
 	rules := []map[string]interface{}{
 		{"type": "deletion"},

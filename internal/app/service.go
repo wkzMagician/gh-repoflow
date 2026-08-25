@@ -90,7 +90,14 @@ func (s Service) Bootstrap(ctx context.Context, options InitOptions) error {
 	if name == "" {
 		name = filepath.Base(s.Root)
 	}
-	if !s.Git.HasOrigin(ctx) {
+	needCreate := !s.Git.HasOrigin(ctx)
+	if !needCreate {
+		// Verify if the configured remote repository actually exists on GitHub
+		if _, err := s.GitHub.RepoInfo(ctx); err != nil && (isNotFound(err) || strings.Contains(err.Error(), "Could not resolve")) {
+			needCreate = true
+		}
+	}
+	if needCreate {
 		if err := s.GitHub.CreateRepository(ctx, name, cfg.Repository.Visibility); err != nil {
 			return err
 		}
@@ -153,13 +160,21 @@ func (s Service) Apply(ctx context.Context, cfg config.Config) error {
 		Name: "RepoFlow main", Branch: "main", Approvals: cfg.Branches.Main.Approvals,
 		RequiredChecks: mainChecks, RequireReleaseSource: true,
 	}); err != nil {
-		return fmt.Errorf("apply main ruleset: %w", err)
+		if github.IsForbidden(err) {
+			fmt.Fprintln(s.Out, "Notice: branch rulesets are not available on this repository (requires GitHub Pro/Team for private repositories). Skipping.")
+		} else {
+			return fmt.Errorf("apply main ruleset: %w", err)
+		}
 	}
 	if _, err := s.GitHub.EnsureRuleset(ctx, github.DesiredRuleSet{
 		Name: "RepoFlow dev", Branch: "dev", Approvals: cfg.Branches.Dev.Approvals,
 		RequiredChecks: checks,
 	}); err != nil {
-		return fmt.Errorf("apply dev ruleset: %w", err)
+		if github.IsForbidden(err) {
+			// Already warned on main
+		} else {
+			return fmt.Errorf("apply dev ruleset: %w", err)
+		}
 	}
 	for _, developer := range cfg.Developers {
 		if _, err := s.GitHub.EnsureCollaborator(ctx, developer, "push"); err != nil {
@@ -238,7 +253,11 @@ func (s Service) Check(ctx context.Context, cfg config.Config) error {
 		Name: "RepoFlow main", Branch: "main", Approvals: cfg.Branches.Main.Approvals, RequiredChecks: mainChecks,
 	})
 	if mainErr != nil {
-		check("main ruleset", mainErr)
+		if github.IsForbidden(mainErr) {
+			fmt.Fprintf(s.Out, "%-24s - skipped (requires GitHub Pro for private repositories)\n", "main ruleset")
+		} else {
+			check("main ruleset", mainErr)
+		}
 	} else if !mainMatch {
 		check("main ruleset", errors.New("missing or differs from expected protected ruleset"))
 	} else {
@@ -248,7 +267,11 @@ func (s Service) Check(ctx context.Context, cfg config.Config) error {
 		Name: "RepoFlow dev", Branch: "dev", Approvals: cfg.Branches.Dev.Approvals, RequiredChecks: devChecks,
 	})
 	if devErr != nil {
-		check("dev ruleset", devErr)
+		if github.IsForbidden(devErr) {
+			fmt.Fprintf(s.Out, "%-24s - skipped (requires GitHub Pro for private repositories)\n", "dev ruleset")
+		} else {
+			check("dev ruleset", devErr)
+		}
 	} else if !devMatch {
 		check("dev ruleset", errors.New("missing or differs from expected protected ruleset"))
 	} else {
@@ -322,6 +345,12 @@ func (s Service) ensureConfig(visibility string) (config.Config, error) {
 		cfg, parseErr := config.Parse(data)
 		if parseErr != nil {
 			return config.Config{}, parseErr
+		}
+		if visibility != "" && cfg.Repository.Visibility != visibility {
+			cfg.Repository.Visibility = visibility
+			if err := os.WriteFile(path, []byte(cfg.YAML()), 0o644); err != nil {
+				return config.Config{}, fmt.Errorf("update %s: %w", config.Path, err)
+			}
 		}
 		return cfg, nil
 	} else if !os.IsNotExist(err) {
@@ -405,6 +434,14 @@ func localFile(root string, paths ...string) error {
 		}
 	}
 	return nil
+}
+
+func isNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "404") || strings.Contains(text, "not found")
 }
 
 func (s Service) String() string {
