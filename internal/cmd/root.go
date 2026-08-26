@@ -19,6 +19,10 @@ func Execute(ctx context.Context, args []string, out, errOut io.Writer) int {
 		printUsage(out)
 		return 0
 	}
+	if args[0] == "version" || args[0] == "--version" {
+		fmt.Fprintln(out, "gh-repoflow v0.1.4")
+		return 0
+	}
 	root, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(errOut, "repoflow: determine working directory: %v\n", err)
@@ -98,6 +102,7 @@ func runCheck(ctx context.Context, service app.Service) error {
 func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "RepoFlow - event-driven GitHub repository governance\n\n"+
 		"Usage:\n"+
+		"  gh repoflow version\n"+
 		"  gh repoflow init [--name NAME] [--public|--private]\n"+
 		"  gh repoflow apply\n"+
 		"  gh repoflow check\n\n"+
