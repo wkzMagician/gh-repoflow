@@ -92,9 +92,19 @@ func (s Service) Bootstrap(ctx context.Context, options InitOptions) error {
 	}
 	needCreate := !s.Git.HasOrigin(ctx)
 	if !needCreate {
-		// Verify if the configured remote repository actually exists on GitHub
-		if _, err := s.GitHub.RepoInfo(ctx); err != nil && (isNotFound(err) || strings.Contains(err.Error(), "Could not resolve")) {
-			needCreate = true
+		// Resolve the origin before querying repository metadata. RepoInfo uses
+		// the discovered owner/name and cannot safely query with an empty repo.
+		if repo, discoverErr := s.GitHub.Discover(ctx); discoverErr != nil {
+			if isNotFound(discoverErr) || strings.Contains(discoverErr.Error(), "Could not resolve") {
+				needCreate = true
+			} else {
+				return discoverErr
+			}
+		} else {
+			s.GitHub.Repo = repo
+			if _, err := s.GitHub.RepoInfo(ctx); err != nil && (isNotFound(err) || strings.Contains(err.Error(), "Could not resolve")) {
+				needCreate = true
+			}
 		}
 	}
 	if needCreate {
