@@ -115,6 +115,33 @@ func (c Client) CreateRepository(ctx context.Context, name, visibility string) e
 	return nil
 }
 
+func (c Client) EnsureTopic(ctx context.Context, topic string) error {
+	topic = strings.TrimSpace(strings.ToLower(topic))
+	if topic == "" {
+		return nil
+	}
+	var current struct {
+		Names []string `json:"names"`
+	}
+	if err := c.api(ctx, "GET", c.endpoint("/topics"), nil, &current); err != nil {
+		return fmt.Errorf("read repository topics: %w", err)
+	}
+	for _, name := range current.Names {
+		if strings.EqualFold(name, topic) {
+			return nil
+		}
+	}
+	names := append([]string(nil), current.Names...)
+	names = append(names, topic)
+	sort.Strings(names)
+	if err := c.api(ctx, "PUT", c.endpoint("/topics"), map[string]interface{}{
+		"names": names,
+	}, nil); err != nil {
+		return fmt.Errorf("write repository topics: %w", err)
+	}
+	return nil
+}
+
 func (c Client) EnsureRepositorySettings(ctx context.Context, desired string) (bool, error) {
 	actual, err := c.RepoInfo(ctx)
 	if err != nil {
