@@ -55,6 +55,7 @@ func runInit(ctx context.Context, service app.Service, args []string, out, errOu
 	visibility := flags.String("visibility", "", "repository visibility: public, private, or internal")
 	public := flags.Bool("public", false, "create a public repository")
 	private := flags.Bool("private", false, "create a private repository")
+	topic := flags.String("topic", "", "GitHub repository topic")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -78,7 +79,9 @@ func runInit(ctx context.Context, service app.Service, args []string, out, errOu
 		return fmt.Errorf("invalid visibility %q", selectedVisibility)
 	}
 	fmt.Fprintln(out, "Initializing RepoFlow...")
-	return service.Bootstrap(ctx, app.InitOptions{Name: *name, Visibility: selectedVisibility})
+	return service.Bootstrap(ctx, app.InitOptions{
+		Name: *name, Visibility: selectedVisibility, Topic: *topic,
+	})
 }
 
 func runApply(ctx context.Context, service app.Service) error {
@@ -103,7 +106,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "RepoFlow - event-driven GitHub repository governance\n\n"+
 		"Usage:\n"+
 		"  gh repoflow version\n"+
-		"  gh repoflow init [--name NAME] [--public|--private]\n"+
+		"  gh repoflow init [--name NAME] [--public|--private] [--topic TOPIC]\n"+
 		"  gh repoflow apply\n"+
 		"  gh repoflow check\n\n"+
 		"Commands:\n"+

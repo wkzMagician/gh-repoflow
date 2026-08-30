@@ -27,6 +27,7 @@ type Service struct {
 type InitOptions struct {
 	Name       string
 	Visibility string
+	Topic      string
 }
 
 func New(root string, runner command.Runner, out io.Writer) Service {
@@ -117,6 +118,11 @@ func (s Service) Bootstrap(ctx context.Context, options InitOptions) error {
 		return err
 	}
 	s.GitHub.Repo = repo
+	if options.Topic != "" {
+		if err := s.GitHub.EnsureTopic(ctx, options.Topic); err != nil {
+			return fmt.Errorf("ensure repository topic: %w", err)
+		}
+	}
 	if err := s.Git.Push(ctx, "main"); err != nil {
 		return fmt.Errorf("push main: %w", err)
 	}

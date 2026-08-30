@@ -56,3 +56,26 @@ func TestAIWorkflowBoundaries(t *testing.T) {
 		t.Fatal("bug-fix workflow is missing its isolated PR path")
 	}
 }
+
+func TestGeneratedWorkflowsHaveRepoFlowAttribution(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	header := "# Managed by RepoFlow: https://github.com/wkzMagician/gh-repoflow\n"
+	for _, relative := range []string{
+		".github/workflows/ai-bug-fix.yml",
+		".github/workflows/ai-debug.yml",
+		".github/workflows/ai-issue-analysis.yml",
+		".github/workflows/ci.yml",
+		".github/workflows/release.yml",
+	} {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(string(data), header) {
+			t.Fatalf("%s is missing RepoFlow attribution", relative)
+		}
+	}
+}

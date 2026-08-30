@@ -32,13 +32,15 @@ From a project directory:
 
 ~~~bash
 gh repoflow init
+gh repoflow init --name my_app --public --topic dartloom
 gh repoflow apply
 gh repoflow check
 ~~~
 
 init bootstraps the local repository, creates the GitHub repository when
 needed, creates and pushes main and dev, generates .github/repoflow.yml and
-the standard workflow files, then runs apply and check.
+the standard workflow files, then runs apply and check. Managed workflows
+include a RepoFlow source comment at the top.
 
 apply reconciles GitHub settings, branches, rulesets, collaborators, and
 labels with .github/repoflow.yml. It is safe to run repeatedly and never
